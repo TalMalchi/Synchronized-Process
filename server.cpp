@@ -25,9 +25,6 @@ using namespace std;
 
 #define BACKLOG 10	 // how many pending connections queue will hold
 
-stack <string> ss; //new stack
-pthread_mutex_t mutex; //lock for critical sections
-int numbytes;
 	
 //hi
 void sigchld_handler(int s)
@@ -53,143 +50,6 @@ void *get_in_addr(struct sockaddr *sa)
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-/*
-Each client connect to the server with new Thread. 
-This function recvie message from the Client, and deals with it.
-In each action -PUSH, POP, TOP- we used "pthread mutex" to lock (and unlock at the end) 
-the critical section in the code.
-In this way we ensure that one client can "chage" the stack each time.
-*/
-
-void *send_function(void *ptr){
-		char buffer[1024]; 
-        int sockfd = *((int*)ptr);
-		int fd;
-		//fstream fd;
-		struct flock fl;
-
-	string line, cmd, data;
-	while(true){
-		try{
-		memset(buffer,0,1024);
-		//get msg from the Client
-        if ((numbytes = recv(sockfd, buffer, sizeof(buffer), 0)) == -1) {
-	    cout << "fail in recieve" << endl;
-		perror("recv");
-	    exit(1);
-		
-	buffer[numbytes] = '\0';
-	printf("Server: received '%s'\n",buffer);
-	}	
-	line = buffer;
-	cmd= line.substr(0, line.find_first_of(" ")); //save the action
-	if (cmd.size() < line.size())
-        {
-            //rest line is data for spesific cmd
-            data = line.substr(line.find_first_of(" ") + 1);
-        }
-	//push Client's data to the stack	
-	if (cmd== "PUSH")
-	{
-		//pthread_mutex_lock(&mutex);
-
-		//fd= open("stack.txt", O_WRONLY);
-		//cout << fd << endl;
-		cout<< "Data to Push: " << data <<endl;
-		cout<< "Inside Push Server.cpp"<<endl;
-		//memset(&fl, 0, sizeof(fl));
-		fl.l_type= F_WRLCK;
-		fcntl(sockfd, F_SETLKW, &fl);
-		ss.push(data); 
-		//pthread_mutex_unlock(&mutex);
-		fl.l_type= F_UNLCK;
-		fcntl(sockfd, F_SETLKW, &fl);
-		//close(fd);
-
-		
-	}
-	//pop the last string from the stack
-	else if (cmd== "POP"){
-		//pthread_mutex_lock(&mutex);	
-		cout<< "Inside Pop Server.cpp"<<endl;
-		if(!ss.empty()){ //check that the stack doesnt empty
-		///LOCK
-			//fd= open("stack.txt", O_RDONLY);
-			//cout << fd << endl;
-			//memset(&fl, 0, sizeof(fl));
-			fl.l_type= F_WRLCK;
-			fcntl(sockfd, F_GETLK, &fl);
-			ss.pop();
-			///UNLOCK
-			fl.l_type= F_UNLCK;
-			fcntl(sockfd, F_GETLK, &fl);
-			//close(fd);
-
-		}
-		else if(ss.empty()){
-			cout<< "Error- Stack is empty!"<<endl;
-		}
-		//pthread_mutex_unlock(&mutex);
-
-	}
-	//Send to the CLient the last data on the stack
-	else if (cmd== "TOP"){
-		string empty_msg= "Error- Stack is empty!" ;
-		//LOCK
-		//fd= open("stack.txt", O_RDONLY);
-		//cout << fd << endl;
-		//memset(&fl, 0, sizeof(fl));
-		fl.l_type= F_WRLCK;
-		fcntl(sockfd, F_GETLK, &fl);
-		cout<< "Inside Top Server.cpp"<<endl;
-		if(ss.empty()){ //The client will get a msg if the stack is empty
-			cout<< empty_msg <<endl;
-			try{
-			//send to Client empty_message
-			if(send(sockfd, empty_msg.c_str(), empty_msg.size()+1, 0) == -1){        
-					perror("send");
-					exit(1);
-			}
-			printf("send-Empty-MSG-to-Client\n");
-			///UNLOCK
-			fl.l_type= F_UNLCK;
-			fcntl(fd, F_GETLK, &fl);
-			//close(fd);
-			
-		}
-		catch(exception& e){
-			cout<<"exception: Can't send message to Client" << endl;
-			
-		}
-		}
-		else if(!ss.empty()){
-		string top_msg;
-		top_msg= ss.top();	
-		printf("TOP_MSG: '%s'\n" ,top_msg.c_str());	
-		try{
-			//send to the Client the data on top of the stack
-			if(send(sockfd, top_msg.c_str(), top_msg.size()+1, 0) == -1){        
-					perror("send");
-					exit(1);
-			}
-			printf("send-top-to-client\n");
-			//UNLOCK
-			fl.l_type= F_UNLCK;
-			fcntl(sockfd, F_GETLK, &fl);
-			//close(fd);
-		}
-		catch(exception& e){
-			cout<<"exception: Can't send message to Client" << endl;
-	}
-	}
-	}
-	}
-	catch(exception& e){
-		cout<<"exception: didnt recieve msg"<<endl;
-	}
-	
-}
-}
 
 int main(void)
 {
@@ -273,10 +133,136 @@ int main(void)
 			s, sizeof s);
 		printf("server: got connection from %s\n", s);
 	
-	//Each Client connect to the Server woth new thread
-		pthread_t thread;
-       pthread_create(&thread, NULL,send_function, (void *)&new_fd);
+/*
+Each client connect to the server with new Process. 
+This part of the code recvie message from the Client, and deals with it.
+In each action -PUSH, POP, TOP- we used "fcntl" to lock (and unlock at the end) 
+the critical section in the code.
+In this way we ensure that one client can "chage" the stack each time.
+*/
+
+//////////////////////////////////////////////////
+
+if (!fork()) { // this is the child process
+	while(true){ // child doesn't need the listener
+		char buffer[1024]; 
+		int numbytes;
+		stack <string> ss; //new stack
+
+	struct flock fl;
+	string line, cmd, data;
+	try{
 		
+		memset(buffer,0,1024);
+		//get msg from the Client
+        if ((numbytes = recv(new_fd, buffer, sizeof(buffer), 0)) == -1) {	
+	    cout << "fail in recieve" << endl;
+		perror("recv");
+	    exit(1);
+		
+	buffer[numbytes] = '\0';
+	printf("Server: received '%s'\n",buffer);
+		
+	line = buffer;
+	cmd= line.substr(0, line.find_first_of(" ")); //save the action
+		}
+	if (cmd.size() < line.size())
+        {
+            //rest line is data for spesific cmd
+            data = line.substr(line.find_first_of(" ") + 1);
+        }
+	//push Client's data to the stack	
+	if (cmd== "PUSH")
+	{
+		cout<< "Data to Push: " << data <<endl;
+		cout<< "Inside Push Server.cpp"<<endl;
+		fl.l_type= F_WRLCK;
+		fcntl(new_fd, F_SETLKW, &fl);
+		ss.push(data); 
+		fl.l_type= F_UNLCK;
+		fcntl(new_fd, F_SETLKW, &fl);
+	
+	}
+	//pop the last string from the stack
+	else if (cmd== "POP"){
+		//pthread_mutex_lock(&mutex);	
+		cout<< "Inside Pop Server.cpp"<<endl;
+		if(!ss.empty()){ //check that the stack doesnt empty
+		///LOCK
+			fl.l_type= F_WRLCK;
+			fcntl(new_fd, F_GETLK, &fl);
+			ss.pop();
+			///UNLOCK
+			fl.l_type= F_UNLCK;
+			fcntl(new_fd, F_GETLK, &fl);
+
+		}
+		else if(ss.empty()){
+			cout<< "Error- Stack is empty!"<<endl;
+		}
+
+	}
+	//Send to the CLient the last data on the stack
+	else if (cmd== "TOP"){
+		string empty_msg= "Error- Stack is empty!" ;
+		//LOCK
+		fl.l_type= F_WRLCK;
+		fcntl(new_fd, F_GETLK, &fl);
+		cout<< "Inside Top Server.cpp"<<endl;
+		if(ss.empty()){ //The client will get a msg if the stack is empty
+			cout<< empty_msg <<endl;
+			try{
+			//send to Client empty_message
+			if(send(new_fd, empty_msg.c_str(), empty_msg.size()+1, 0) == -1){        
+					perror("send");
+					exit(1);
+			}
+			printf("send-Empty-MSG-to-Client\n");
+			///UNLOCK
+			fl.l_type= F_UNLCK;
+			fcntl(new_fd, F_GETLK, &fl);
+			
+		}
+		catch(exception& e){
+			cout<<"exception: Can't send message to Client" << endl;
+			
+		}
+		}
+		else if(!ss.empty()){
+		string top_msg;
+		top_msg= ss.top();	
+		printf("TOP_MSG: '%s'\n" ,top_msg.c_str());	
+		try{
+			//send to the Client the data on top of the stack
+			if(send(new_fd, top_msg.c_str(), top_msg.size()+1, 0) == -1){        
+					perror("send");
+					exit(1);
+			}
+			printf("send-top-to-client\n");
+			//UNLOCK
+			fl.l_type= F_UNLCK;
+			fcntl(new_fd, F_GETLK, &fl);
+			//close(fd);
+		}
+		catch(exception& e){
+			cout<<"exception: Can't send message to Client" << endl;
+	}
+	}
+	}
+	}
+	catch(exception& e){
+		cout<<"exception: didnt recieve msg"<<endl;
+	}
 }
-return 0;
+close(new_fd);
+exit(0);
 }
+	
+            
+        }
+        close(new_fd);  // parent doesn't need this
+		 return 0;
+    }
+
+   
+
