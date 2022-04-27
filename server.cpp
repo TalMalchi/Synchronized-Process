@@ -93,18 +93,18 @@ void *send_function(void *ptr){
 	{
 		//pthread_mutex_lock(&mutex);
 
-		fd= open("stack.txt", O_WRONLY);
-		cout << fd << endl;
+		//fd= open("stack.txt", O_WRONLY);
+		//cout << fd << endl;
 		cout<< "Data to Push: " << data <<endl;
 		cout<< "Inside Push Server.cpp"<<endl;
-		memset(&fl, 0, sizeof(fl));
+		//memset(&fl, 0, sizeof(fl));
 		fl.l_type= F_WRLCK;
-		fcntl(fd, F_SETLKW, &fl);
+		fcntl(sockfd, F_SETLKW, &fl);
 		ss.push(data); 
 		//pthread_mutex_unlock(&mutex);
 		fl.l_type= F_UNLCK;
-		fcntl(fd, F_SETLKW, &fl);
-		close(fd);
+		fcntl(sockfd, F_SETLKW, &fl);
+		//close(fd);
 
 		
 	}
@@ -114,16 +114,16 @@ void *send_function(void *ptr){
 		cout<< "Inside Pop Server.cpp"<<endl;
 		if(!ss.empty()){ //check that the stack doesnt empty
 		///LOCK
-			fd= open("stack.txt", O_RDONLY);
-			cout << fd << endl;
-			memset(&fl, 0, sizeof(fl));
+			//fd= open("stack.txt", O_RDONLY);
+			//cout << fd << endl;
+			//memset(&fl, 0, sizeof(fl));
 			fl.l_type= F_WRLCK;
-			fcntl(fd, F_GETLK, &fl);
+			fcntl(sockfd, F_GETLK, &fl);
 			ss.pop();
 			///UNLOCK
 			fl.l_type= F_UNLCK;
-			fcntl(fd, F_GETLK, &fl);
-			close(fd);
+			fcntl(sockfd, F_GETLK, &fl);
+			//close(fd);
 
 		}
 		else if(ss.empty()){
@@ -136,11 +136,11 @@ void *send_function(void *ptr){
 	else if (cmd== "TOP"){
 		string empty_msg= "Error- Stack is empty!" ;
 		//LOCK
-		fd= open("stack.txt", O_RDONLY);
-		cout << fd << endl;
-		memset(&fl, 0, sizeof(fl));
+		//fd= open("stack.txt", O_RDONLY);
+		//cout << fd << endl;
+		//memset(&fl, 0, sizeof(fl));
 		fl.l_type= F_WRLCK;
-		fcntl(fd, F_GETLK, &fl);
+		fcntl(sockfd, F_GETLK, &fl);
 		cout<< "Inside Top Server.cpp"<<endl;
 		if(ss.empty()){ //The client will get a msg if the stack is empty
 			cout<< empty_msg <<endl;
@@ -154,7 +154,7 @@ void *send_function(void *ptr){
 			///UNLOCK
 			fl.l_type= F_UNLCK;
 			fcntl(fd, F_GETLK, &fl);
-			close(fd);
+			//close(fd);
 			
 		}
 		catch(exception& e){
@@ -175,8 +175,8 @@ void *send_function(void *ptr){
 			printf("send-top-to-client\n");
 			//UNLOCK
 			fl.l_type= F_UNLCK;
-			fcntl(fd, F_GETLK, &fl);
-			close(fd);
+			fcntl(sockfd, F_GETLK, &fl);
+			//close(fd);
 		}
 		catch(exception& e){
 			cout<<"exception: Can't send message to Client" << endl;
