@@ -142,12 +142,12 @@ In this way we ensure that one client can "chage" the stack each time.
 */
 
 //////////////////////////////////////////////////
-
+stack <string> ss; //new stack
 if (!fork()) { // this is the child process
 	while(true){ // child doesn't need the listener
 		char buffer[1024]; 
 		int numbytes;
-		stack <string> ss; //new stack
+		
 
 	struct flock fl;
 	string line, cmd, data;
@@ -162,10 +162,10 @@ if (!fork()) { // this is the child process
 		
 	buffer[numbytes] = '\0';
 	printf("Server: received '%s'\n",buffer);
-		
+		}
 	line = buffer;
 	cmd= line.substr(0, line.find_first_of(" ")); //save the action
-		}
+		
 	if (cmd.size() < line.size())
         {
             //rest line is data for spesific cmd
@@ -187,7 +187,11 @@ if (!fork()) { // this is the child process
 	else if (cmd== "POP"){
 		//pthread_mutex_lock(&mutex);	
 		cout<< "Inside Pop Server.cpp"<<endl;
-		if(!ss.empty()){ //check that the stack doesnt empty
+
+		if(ss.empty()){
+			cout<< "Error- Stack is empty!"<<endl;
+		}
+		else if(!ss.empty()){ //check that the stack doesnt empty
 		///LOCK
 			fl.l_type= F_WRLCK;
 			fcntl(new_fd, F_GETLK, &fl);
@@ -196,9 +200,6 @@ if (!fork()) { // this is the child process
 			fl.l_type= F_UNLCK;
 			fcntl(new_fd, F_GETLK, &fl);
 
-		}
-		else if(ss.empty()){
-			cout<< "Error- Stack is empty!"<<endl;
 		}
 
 	}
