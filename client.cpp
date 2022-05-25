@@ -10,6 +10,7 @@
 #include <netdb.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <string>
 #include <iostream>
@@ -21,6 +22,19 @@ using namespace std;
 #define PORT "3490" // the port client will be connecting to
 
 #define MAXDATASIZE 100 // max number of bytes we can get at once
+
+
+void sigchld_handler(int s)
+{
+    // waitpid() might overwrite errno, so we save and restore it:
+    int saved_errno = errno;
+
+    while(waitpid(-1, NULL, WNOHANG) > 0);
+
+    errno = saved_errno;
+}
+
+
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
