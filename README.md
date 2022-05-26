@@ -1,4 +1,4 @@
-# Synchronized-MultiThreading
+# Synchronized-Process
 
 * Written by Guy Azoulay - 207709734 
              Tal Malchi -  208278556
