@@ -1,4 +1,4 @@
-
+all: server client
 
 client: client.o
 	g++ -o client client.o 
@@ -17,4 +17,4 @@ server.o: server.cpp
 
 
 clean:
-	rm -f *.o server client
+	rm -f *.o server client all
