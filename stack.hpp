@@ -7,7 +7,7 @@
 #include <arpa/inet.h>
 using namespace std;
 
-// stack class implementation
+//stack class implementation
 
 int fd;
 struct flock fl;
